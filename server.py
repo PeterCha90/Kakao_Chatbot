@@ -1,8 +1,9 @@
 import uvicorn
-import asyncio
-from pprint import pprint
+
+from utils import msg
 from typing import Dict
 from chain import chain
+from pprint import pprint
 from prisma import Prisma
 from fastapi import FastAPI
 from typing import List, Union
@@ -57,30 +58,58 @@ async def addItem(req: Dict):
                 },
             )
             if existing_item:
-                return {
-                    "version": "2.0",
-                    "data": {
-                        "msg": "🌿 이미 등록되어 있는 상품으로 등록을 취소합니다."
-                    }
-                }
+                return msg("🌿 이미 등록되어 있는 상품으로 등록을 취소합니다.")
 
             await db.item.create(
                 data={"name": name, "price": int(price), "end": False},
             )
-        return {
-            "version": "2.0",
-            "data": {
-                "msg": "🌿 상품이 성공적으로 등록 되었습니다!"
-            }
-        }
+        return msg("🌿 상품이 성공적으로 등록 되었습니다!")
     except Exception as e:
         print(e)
-        return {
-            "version": "2.0",
-            "data": {
-                "msg": f"🌿 올바른 입력 형식이 아니거나, 에러가 발생했습니다.🥲"
-            }
-        }
+        return msg("🌿 올바른 입력 형식이 아니거나, 에러가 발생했습니다.🥲")
+    finally:
+        await db.disconnect()
+
+
+############## 상품 테이블 조회 ###############
+# item에 등록되어 있는 상품을 모두 조회하여 반환    #
+# #########################################
+@app.post("/getTable")
+async def getTable(req: Dict):
+    await db.connect()
+    try:
+        items = await db.item.find_many()
+        pprint(items)
+        reply = {'opened': [], 'closed': []}
+
+        # item을 순회하며 end 값이 true면 reply 'opened'에
+        # (name, price) append, false면 'closed'에 append
+        reply['opened'] = [{'name': item.name,
+                            'price': item.price}
+                           for item in items if not item.end]
+        reply['closed'] = [{'name': item.name,
+                            'price': item.price}
+                           for item in items if item.end]
+        # reply opened의 데이터들을
+        # f"{name} - {price}원\n"{name} - {price}원\n(repeat)..."
+        # 형태의 str로 반환
+        opened_str = "\n".join(
+            [f"▫️ {item['name']} - {item['price']}원" for item in reply['opened']])
+        closed_str = "\n".join(
+            [f"◾️ {item['name']} - {item['price']}원" for item in reply['closed']])
+
+        reply['opened'] = opened_str
+        reply['closed'] = closed_str
+
+        if not reply['opened']:
+            reply['opened'] = '🌿 현재 등록된 상품이 없습니다.'
+        if not reply['closed']:
+            reply['closed'] = '🌿 현재 마감된 상품이 없습니다.'
+        pprint(reply)
+        return msg(reply)
+    except Exception as e:
+        print(e)
+        return msg("🌿 상품 조회에 실패했습니다.🥲")
     finally:
         await db.disconnect()
 
@@ -97,12 +126,12 @@ async def endItem(req: Dict):
         item = await db.item.find_unique(where={"name": item_name})
         if item:
             await db.item.update(where={"name": item_name}, data={"end": True})
-            return {"msg": f"{item_name} 마감했습니다."}
+            return msg(f"{item_name} 마감했습니다.")
         else:
-            return {"msg": "해당하는 이름의 상품이 없습니다."}
+            return msg("해당하는 이름의 상품이 없습니다.")
     except Exception as e:
         print(e)
-        return {"msg": "오류가 발생했습니다. 다시 시도해주세요."}
+        return msg("오류가 발생했습니다. 다시 시도해주세요.")
     finally:
         await db.disconnect()
 
@@ -118,12 +147,12 @@ async def deleteItem(req: Dict):
         item = await db.item.find_unique(where={"name": item_name})
         if item:
             await db.item.delete(where={"name": item_name})
-            return {"msg": f"{item_name}을 삭제했습니다."}
+            return msg(f"{item_name}을 삭제했습니다.")
         else:
-            return {"msg": "해당하는 이름의 상품이 없습니다."}
+            return msg("해당하는 이름의 상품이 없습니다.")
     except Exception as e:
         print(e)
-        return {"msg": f"오류가 발생했습니다. 다시 시도해주세요."}
+        return msg("오류가 발생했습니다. 다시 시도해주세요.")
     finally:
         await db.disconnect()
 
@@ -140,14 +169,14 @@ async def reopenItem(req: Dict):
         if item:
             if item.end:
                 await db.item.update(where={"name": item_name}, data={"end": False})
-                return {"msg": f"{item_name}을 재오픈했습니다."}
+                return msg(f"{item_name}을 재오픈했습니다.")
             else:
-                return {"msg": "이미 오픈된 상태입니다."}
+                return msg("이미 오픈된 상태입니다.")
         else:
-            return {"msg": "해당하는 이름의 상품이 없습니다."}
+            return msg("해당하는 이름의 상품이 없습니다.")
     except Exception as e:
         print(e)
-        return {"msg": f"오류가 발생했습니다. 다시 시도해주세요."}
+        return msg(f"오류가 발생했습니다. 다시 시도해주세요.")
     finally:
         await db.disconnect()
 
