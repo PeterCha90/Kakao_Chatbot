@@ -1,0 +1,31 @@
+// database
+datasource db {
+  provider = "sqlite"
+  url      = "file:green_forest.db"
+}
+
+// generator
+generator client {
+  provider             = "prisma-client-py"
+  recursive_type_depth = 5
+}
+
+model Item {
+  id    Int     @id @default(autoincrement())
+  name  String  @unique
+  end   Boolean  @default(false) // default는 False
+  price Int
+  orders Order[]
+}
+
+model Order {
+  id        Int     @id @default(autoincrement())
+  itemId    Int
+  customer  String
+  deposit   Boolean @default(false)
+  type      String  // 예약, 배달, 대기
+  count     Int     // 1kg면 1, 2kg면 2
+  item      Item    @relation(fields: [itemId], references: [id])
+
+  @@index([itemId])
+}
