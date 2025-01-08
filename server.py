@@ -114,7 +114,7 @@ async def getTable(req: Dict):
         await db.disconnect()
 
 
-############### 상품 마감 ###################
+############### 상품 마감 ################### <- 여기부터 테스트 중 🧪    ##
 # item_name에 해당하는 상품을                 #
 # item 테이블에서 찾은 뒤 마감여부 True로 업데이트 #
 ###########################################
@@ -182,18 +182,19 @@ async def reopenItem(req: Dict):
 
 
 ###################### 주문내역 확인 ###########################
+# 특정 상품 주문 받기                                           #
+# 특정 상품에 대해 order를 새로 생성하는 함수                       #
+#  #
+#############################################################
+
+
+###################### 주문내역 확인 ###########################
 # 현재 마감이 되지 않은 상품들(end=false)만 item에서 조회하고         #
 # 해당 item에 해당하는 order들을 order에서 조회한 뒤                #
 # 각 상품이름(Item table의 item) 별로 order 리스트로 묶어서 반환하시오 #
 #############################################################
-# @app.get("/orders")
+# @app.get("/check_total_orders")
 # async def check_order():
-#     end_false_items = await Item.filter(end=False)
-#     order_dict = defaultdict(list)
-#     for item in end_false_items:
-#         orders = await Order.filter(item=item).prefetch_related("customer")
-#         for order in orders:
-#             customer_phone = order.customer.phone_number
 
 
 ###################### 주문내역 확인 ###########################

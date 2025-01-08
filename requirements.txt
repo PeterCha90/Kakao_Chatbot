@@ -1,0 +1,12 @@
+# FastAPI 및 관련 미들웨어
+fastapi
+uvicorn
+pydantic
+
+# Prisma 클라이언트
+prisma
+
+# LangChain 관련 라이브러리
+langserve
+langchain-core
+langchain_ollama
