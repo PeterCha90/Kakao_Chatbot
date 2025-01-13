@@ -10,3 +10,6 @@ prisma
 langserve
 langchain-core
 langchain_ollama
+
+# ollama-ocr
+ollama-ocr

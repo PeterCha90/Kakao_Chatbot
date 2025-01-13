@@ -1,13 +1,14 @@
+import json
 import uvicorn
 
 from utils import msg
 from typing import Dict
-from chain import chain
 from pprint import pprint
 from prisma import Prisma
 from fastapi import FastAPI
 from typing import List, Union
 from langserve import add_routes
+from llama_vision import perform_ocr
 from pydantic import BaseModel, Field
 from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -58,12 +59,12 @@ async def addItem(req: Dict):
                 },
             )
             if existing_item:
-                return msg("🌿 이미 등록되어 있는 상품으로 등록을 취소합니다.")
+                return msg("🌿 이미 등록되어 있는 상품입니다.")
 
             await db.item.create(
                 data={"name": name, "price": int(price), "end": False},
             )
-        return msg("🌿 상품이 성공적으로 등록 되었습니다!")
+        return msg("🌿 상품이 성공적으로 등록 되었습니다! :)")
     except Exception as e:
         print(e)
         return msg("🌿 올바른 입력 형식이 아니거나, 에러가 발생했습니다.🥲")
@@ -114,24 +115,33 @@ async def getTable(req: Dict):
         await db.disconnect()
 
 
-############### 상품 마감 ################### <- 여기부터 테스트 중 🧪    ##
-# item_name에 해당하는 상품을                 #
-# item 테이블에서 찾은 뒤 마감여부 True로 업데이트 #
+############### 상품 마감 ####################
+# item 테이블에서 찾은 뒤 마감여부 True로 업데이트  #
 ###########################################
 @ app.post("/endItem")
 async def endItem(req: Dict):
     await db.connect()
     try:
-        item_name = req['action']['params']['name']
-        item = await db.item.find_unique(where={"name": item_name})
-        if item:
-            await db.item.update(where={"name": item_name}, data={"end": True})
-            return msg(f"{item_name} 마감했습니다.")
-        else:
-            return msg("해당하는 이름의 상품이 없습니다.")
+        info = req['action']['params']['item_info']
+        itemData = info.split(',')
+
+        for item_name in itemData:
+            closed = []
+            item_name = item_name.strip()
+            item = await db.item.find_unique(where={"name": item_name})
+            if item:
+                await db.item.update(where={"name": item_name}, data={"end": True})
+                closed.append(item_name)
+            else:
+                message = f"🌿 {item_name} 이름의 상품이 없습니다."
+                message += f"\n🌿 {', '.join(closed)}는 삭제되었습니다." if len(
+                    closed) > 0 else ""
+                return msg()
+        return msg(f"🌿 총 {len(itemData)}건 마감했습니다. :)")
+
     except Exception as e:
-        print(e)
-        return msg("오류가 발생했습니다. 다시 시도해주세요.")
+        print(f'========= {e}')
+        return msg("🌿\n오류가 발생했습니다. 다시 시도해주세요. :()")
     finally:
         await db.disconnect()
 
@@ -139,20 +149,30 @@ async def endItem(req: Dict):
 ############### 상품 삭제 ###################
 # item_name에 해당하는 상품을 삭제             #
 ###########################################
-@ app.post("/deleteItem")
+@app.post("/deleteItem")
 async def deleteItem(req: Dict):
     await db.connect()
     try:
-        item_name = req['action']['params']['name']
-        item = await db.item.find_unique(where={"name": item_name})
-        if item:
-            await db.item.delete(where={"name": item_name})
-            return msg(f"{item_name}을 삭제했습니다.")
-        else:
-            return msg("해당하는 이름의 상품이 없습니다.")
+        deleted = []
+        info = req['action']['params']['item_info']
+        itemData = info.split(',')
+
+        for item_name in itemData:
+            item_name = item_name.strip()
+            item = await db.item.find_unique(where={"name": item_name})
+            if item:
+                await db.item.delete(where={"name": item_name})
+                deleted.append(item_name)
+            else:
+                message = f"🌿 {item_name} 이름의 상품이 없습니다. "
+                message += f"\n🌿 {', '.join(deleted)}는 삭제되었습니다." if len(
+                    deleted) > 0 else ""
+                return msg()
+        return msg(f"🌿 총 {len(itemData)}건 삭제되었습니다. :)")
+
     except Exception as e:
         print(e)
-        return msg("오류가 발생했습니다. 다시 시도해주세요.")
+        return msg("🌿 오류가 발생했습니다. 다시 시도해주세요. :(")
     finally:
         await db.disconnect()
 
@@ -160,7 +180,7 @@ async def deleteItem(req: Dict):
 ############### 상품 재오픈 #################
 # item_name에 해당하는 상품을 재오픈           #
 ##########################################
-@ app.post("/reopenItem")
+@app.post("/reopenItem")
 async def reopenItem(req: Dict):
     await db.connect()
     try:
@@ -169,14 +189,14 @@ async def reopenItem(req: Dict):
         if item:
             if item.end:
                 await db.item.update(where={"name": item_name}, data={"end": False})
-                return msg(f"{item_name}을 재오픈했습니다.")
+                return msg(f"🌿 {item_name}을 재오픈했습니다.")
             else:
-                return msg("이미 오픈된 상태입니다.")
+                return msg(f"🌿 {item_name} 이미 오픈된 상태입니다.")
         else:
-            return msg("해당하는 이름의 상품이 없습니다.")
+            return msg("🌿 해당하는 이름의 상품이 없습니다. :(")
     except Exception as e:
         print(e)
-        return msg(f"오류가 발생했습니다. 다시 시도해주세요.")
+        return msg(f"🌿 오류가 발생했습니다. 다시 시도해주세요.")
     finally:
         await db.disconnect()
 
@@ -184,31 +204,116 @@ async def reopenItem(req: Dict):
 ###################### 주문내역 확인 ###########################
 # 특정 상품 주문 받기                                           #
 # 특정 상품에 대해 order를 새로 생성하는 함수                       #
-#  #
-#############################################################
+############################################################
+@app.post("/order")
+async def order(req: Dict):
+    await db.connect()
+    try:
+        info = req['action']['params']['item_info']
+        itemData = info.split(',')
+
+        for idx, item_info in enumerate(itemData):
+            cstm, item_name, count, type, deposit = item_info.split('/')
+            print(cstm, item_name, count, type, deposit)
+
+            item_name = item_name.strip()
+            item = await db.item.find_unique(where={"name": item_name})
+
+            if item:
+                await db.order.create(
+                    data={
+                        "item_name": item_name,
+                        "customer": cstm,
+                        "deposit": True if deposit == "입금" else False,
+                        "type": type,
+                        "count": int(count)
+                    }
+                )
+            else:
+                return msg(f"🌿 {item_name}라는 이름의 상품이 없습니다. ")
+        return msg(f"🌿 총 {len(itemData)}개 주문이 완료되었습니다. :)")
+
+    except Exception as e:
+        print(e)
+        return msg(f"🌿 {idx+1}번째 주문을 처리하던 중 오류가 발생했습니다.")
+    finally:
+        await db.disconnect()
+
+
+#####################  테스트🧪 완료  #########################
 
 
 ###################### 주문내역 확인 ###########################
-# 현재 마감이 되지 않은 상품들(end=false)만 item에서 조회하고         #
 # 해당 item에 해당하는 order들을 order에서 조회한 뒤                #
 # 각 상품이름(Item table의 item) 별로 order 리스트로 묶어서 반환하시오 #
 #############################################################
-# @app.get("/check_total_orders")
-# async def check_order():
+@app.post("/check_order_list")
+async def check_order_list():
+    await db.connect()
+    try:
+        # 현재 item 테이블에 등록된 모든 아이템들의 name 가져오기
+        items = await db.item.find_many()
+        item_names = [item.name for item in items]  # 리스트로 변환
+
+        order_dict = {}
+        for item_name in item_names:
+            # order table에서 item_name이 item_name인 order의 모든 row 갯수 세기
+            order_count = await db.order.count(where={"item_name": item_name})
+            order_dict[item_name] = order_count
+
+        print(order_dict)
+        # order_dict에 있을 데이터에 맞춰 string만들기
+        res_msg = f"🌿 주문 내역 확인 🌿"
+        for item_name, count in order_dict.items():
+            res_msg += f"\n▫️ {item_name}: {count}개"
+        return msg(res_msg)
+    except Exception as e:
+        print(e)
+        return msg(f"🌿 처리하던 중 오류가 발생했습니다.")
+    finally:
+        await db.disconnect()
 
 
-###################### 주문내역 확인 ###########################
-# 현재 Item에 해당하는 이름의 상품이 있는지 확인(end=False)           #
-# 해당 item Id를 itemId로 가지는 order 데이터 생성                 #
+##################  특정 유저 주문내역 확인    ####################
+# Order Table의 현재 상태 조회                                  #
 #############################################################
-# @app.post("/create_order")
-# async def create_order(item_id: int, customer_id: int):
-#     item = await Item.get(id=item_id)
-#     if item.end:
-#         raise HTTPException(
-#             status_code=400, detail="This item is no longer available.")
-#     order = await Order.create(item=item, customer_id=customer_id)
-#     return order
+@app.post("/list_of_order")
+async def list_of_order(req: Dict):
+    # item = await Item.get(id=item_id)
+    # if item.end:
+    #     raise HTTPException(
+    #         status_code=400, detail="This item is no longer available.")
+    # order = await Order.create(item=item, customer_id=customer_id)
+    return order
+
+
+###################### 이미지 수신  ###########################
+# 이미지 수신해서 llama3.2 vision을 OCR로 사용하기.               #
+# 해당 item Id를 itemId로 가지는 order 데이터 생성               #
+############################################################
+@app.post("/imageUrl")
+async def image_url(req: Dict):
+    url_info = req['action']['params']['imageUrl']
+    # print("----------------------------")
+    # url_info JSON.parse 하기
+    url_info_json = json.loads(url_info)
+    url_str = url_info_json['secureUrls']
+    # 'List('와 ')' 제거
+    secure_urls_str = url_str[5:-1]
+    # ','로 분리하여 리스트로 만들고 양쪽 공백 제거
+    secure_urls = [url.strip() for url in secure_urls_str.split(',')]
+
+    pprint(secure_urls)
+    try:
+        for url in secure_urls:
+            result = perform_ocr(url)
+            print(result)
+    except Exception as e:
+        print(f"Error: {e}")
+        return ("🌿 문제가 발생했어요. :(")
+
+    # print("----------------------------")
+    return msg("잘 들어왔어요")
 
 
 class InputChat(BaseModel):
@@ -223,10 +328,6 @@ class InputChat(BaseModel):
 # add_routes(app, rag_chain, path="/rag", enable_feedback_endpoint=True,
 #            enable_public_trace_link_endpoint=True,)
 # add_routes(app, chain, path="/chain")
-# add_routes(app, path="/addItem")
-# add_routes(app, path="/endItem/{item_name}")
-# add_routes(app, path="/deleteItem/{item_name}")
-# add_routes(app, path="/reopenItem/{item_name}")
 
 
 if __name__ == "__main__":

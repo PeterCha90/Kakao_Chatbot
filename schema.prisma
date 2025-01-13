@@ -20,12 +20,10 @@ model Item {
 
 model Order {
   id        Int     @id @default(autoincrement())
-  itemId    Int
+  item_name String 
   customer  String
   deposit   Boolean @default(false)
   type      String  // 예약, 배달, 대기
   count     Int     // 1kg면 1, 2kg면 2
-  item      Item    @relation(fields: [itemId], references: [id])
-
-  @@index([itemId])
+  item      Item    @relation(fields: [item_name], references: [name])
 }
