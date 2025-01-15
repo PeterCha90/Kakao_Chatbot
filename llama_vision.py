@@ -8,10 +8,18 @@ from pprint import pprint
 
 from dateutil import parser
 
-SYSTEM_PROMPT = """Act as an OCR assistant. Analyze the provided image and:
+OCR_PROMPT = """Act as an OCR assistant. Analyze the provided image and:
 1. Recognize all visible text in the image as accurately as possible.
 2. Maintain the original structure and formatting of the text.
 3. If any words or phrases are unclear, indicate this with [unclear] in your transcription.
+Provide only the transcription without any additional comments."""
+
+CHAT_PROMPT = """The following conversation contains a customer's order for a specific product. 
+Please summarize the conversation and provide a response in JSON format according following rules:
+1. store the customer's name with the key 'customer'
+2. store the ordered product with the key 'item'
+3. store the order quantity with the key 'count'.
+4. store all the orders of customers as a list of order objects.
 Provide only the transcription without any additional comments."""
 
 
@@ -29,22 +37,39 @@ def perform_ocr(image_path):
     # 시작 시간
     """Perform OCR on the given image using Llama 3.2-Vision."""
     base64_image = encode_image_to_base64(image_path)
-    response = ollama.chat(
+    ocr_res = ollama.chat(
         model='llama3.2-vision',
         messages=[{
             "role": "user",
-            "content": SYSTEM_PROMPT,
+            "content": OCR_PROMPT,
             "images": [base64_image],
         }],
         # Set temperature to 0 for more deterministic output
         options={'temperature': 0},
     )
-    result = json.loads(response.model_dump_json())
-    date = parser.isoparse(result['created_at']).date()
+    # parsing the data
+    date = parser.isoparse(ocr_res['created_at']).date()
+    ocr_result = json.loads(ocr_res.model_dump_json())
+    ocr_content = ocr_result['message']['content']
+
     print("===========================")
     print(date)
-    pprint(result['message']['content'])
+    pprint(ocr_content)
     print("===========================")
     # 소요시간을 초단위로 계산
+    chat_res = ollama.chat(
+        model='phi4',
+        messages=[{
+            "role": "user",
+            "content": CHAT_PROMPT + f"\n{ocr_content}",
+        }],
+        # Set temperature to 0 for more deterministic output
+        options={'temperature': 0},
+    )
+    chat_result = json.loads(chat_res.model_dump_json())
+    chat_content = chat_result['message']['content']
+    print("===========================")
+    pprint(chat_content)
+    print("===========================")
 
-    return None
+    return date, chat_res

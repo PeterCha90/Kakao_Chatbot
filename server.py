@@ -293,27 +293,22 @@ async def list_of_order(req: Dict):
 ############################################################
 @app.post("/imageUrl")
 async def image_url(req: Dict):
+    # imageURL parsing하기
     url_info = req['action']['params']['imageUrl']
-    # print("----------------------------")
-    # url_info JSON.parse 하기
     url_info_json = json.loads(url_info)
     url_str = url_info_json['secureUrls']
-    # 'List('와 ')' 제거
     secure_urls_str = url_str[5:-1]
-    # ','로 분리하여 리스트로 만들고 양쪽 공백 제거
     secure_urls = [url.strip() for url in secure_urls_str.split(',')]
 
-    pprint(secure_urls)
     try:
         for url in secure_urls:
-            result = perform_ocr(url)
+            date, result = perform_ocr(url)
             print(result)
+        return msg(result)
+
     except Exception as e:
         print(f"Error: {e}")
-        return ("🌿 문제가 발생했어요. :(")
-
-    # print("----------------------------")
-    return msg("잘 들어왔어요")
+        return msg("🌿 문제가 발생했어요. :(")
 
 
 class InputChat(BaseModel):
