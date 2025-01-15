@@ -243,7 +243,7 @@ async def order(req: Dict):
 #####################  테스트🧪 완료  #########################
 
 
-###################### 주문내역 확인 ###########################
+###################### 전체 주문내역 확인 #######################
 # 해당 item에 해당하는 order들을 order에서 조회한 뒤                #
 # 각 상품이름(Item table의 item) 별로 order 리스트로 묶어서 반환하시오 #
 #############################################################
@@ -265,7 +265,7 @@ async def check_order_list():
         # order_dict에 있을 데이터에 맞춰 string만들기
         res_msg = f"🌿 주문 내역 확인 🌿"
         for item_name, count in order_dict.items():
-            res_msg += f"\n▫️ {item_name}: {count}개"
+            res_msg += f"\n▫️ {item_name}: {count} 건"
         return msg(res_msg)
     except Exception as e:
         print(e)

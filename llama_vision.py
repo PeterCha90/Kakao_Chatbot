@@ -1,23 +1,12 @@
+import json
+import ollama
 import base64
 import requests
 
 from PIL import Image
 from pprint import pprint
-# from langchain_community.chat_models import ChatOllama
-# from langchain_ollama import ChatOllama
-# from langchain_core.output_parsers import StrOutputParser
-# from langchain_core.prompts import ChatPromptTemplate
 
-
-# # LangChain이 지원하는 다른 채팅 모델을 사용합니다. 여기서는 Ollama를 사용합니다.
-# llm = ChatOllama(model="llama-vision:4Q")
-
-# # 프롬프트 설정
-# prompt = ChatPromptTemplate.from_template("{topic} 에 대하여 간략히 설명해 줘.")
-
-# # LangChain 표현식 언어 체인 구문을 사용합니다.
-# chain = prompt | llm | StrOutputParser()
-
+from dateutil import parser
 
 SYSTEM_PROMPT = """Act as an OCR assistant. Analyze the provided image and:
 1. Recognize all visible text in the image as accurately as possible.
@@ -37,28 +26,25 @@ def encode_image_to_base64(image_url):
 
 
 def perform_ocr(image_path):
+    # 시작 시간
     """Perform OCR on the given image using Llama 3.2-Vision."""
     base64_image = encode_image_to_base64(image_path)
-    response = requests.post(
-        # Ensure this URL matches your Ollama service endpoint
-        "http://localhost:11434/api/chat",
-        json={
-            "model": "llama3.2-vision",
-            "messages": [
-                {
-                    "role": "user",
-                    "content": SYSTEM_PROMPT,
-                    "images": [base64_image],
-                },
-            ],
-        }
+    response = ollama.chat(
+        model='llama3.2-vision',
+        messages=[{
+            "role": "user",
+            "content": SYSTEM_PROMPT,
+            "images": [base64_image],
+        }],
+        # Set temperature to 0 for more deterministic output
+        options={'temperature': 0},
     )
-    if response.status_code == 200:
-        print("===========================")
-        pprint(response.json())
-        pprint(response.content)
-        print("===========================")
-        return response.json()
-    else:
-        print("Error:", response.status_code, response.text)
-        return None
+    result = json.loads(response.model_dump_json())
+    date = parser.isoparse(result['created_at']).date()
+    print("===========================")
+    print(date)
+    pprint(result['message']['content'])
+    print("===========================")
+    # 소요시간을 초단위로 계산
+
+    return None

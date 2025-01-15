@@ -19,11 +19,14 @@ model Item {
 }
 
 model Order {
-  id        Int     @id @default(autoincrement())
-  item_name String 
-  customer  String
-  deposit   Boolean @default(false)
-  type      String  // 예약, 배달, 대기
-  count     Int     // 1kg면 1, 2kg면 2
-  item      Item    @relation(fields: [item_name], references: [name])
+  id           Int      @id @default(autoincrement())
+  item_name    String 
+  customer     String
+  deposit      Boolean  @default(false)
+  type         String  
+  count        Int     
+  created_at   DateTime
+  scheduled_at DateTime?
+  status       String   // 준비중, 배달중, 완료
+  item         Item     @relation(fields: [item_name], references: [name])
 }

@@ -13,3 +13,6 @@ langchain_ollama
 
 # ollama-ocr
 ollama-ocr
+
+# utils
+python-dateutil
