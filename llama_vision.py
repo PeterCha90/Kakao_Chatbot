@@ -8,6 +8,8 @@ from pprint import pprint
 
 from dateutil import parser
 
+from utils import extract_json_str
+
 OCR_PROMPT = """Act as an OCR assistant. Analyze the provided image and:
 1. Recognize all visible text in the image as accurately as possible.
 2. Maintain the original structure and formatting of the text.
@@ -23,20 +25,25 @@ Please summarize the conversation and provide a response in JSON format accordin
 Provide only the transcription without any additional comments."""
 
 
-def encode_image_to_base64(image_url):
-    """Convert an image from a URL to a base64 encoded string."""
-    response = requests.get(image_url)
-    if response.status_code == 200:
-        return base64.b64encode(response.content).decode('utf-8')
-    else:
+def encode_image_to_base64(image_path, url=True):
+    try:
+        if url:
+            """Convert an image from a URL to a base64 encoded string."""
+            response = requests.get(image_path)
+            if response.status_code == 200:
+                return base64.b64encode(response.content).decode('utf-8')
+        else:
+            """Convert an image from a local file path to a base64 encoded string."""
+            with open(image_path, 'rb') as image_file:
+                return base64.b64encode(image_file.read()).decode('utf-8')
+    except Exception as e:
         raise Exception(
-            f"Failed to retrieve image. Status code: {response.status_code}")
+            f"Failed to retrieve image: {e}")
 
 
-def perform_ocr(image_path):
-    # 시작 시간
+def perform_ocr(image_path, url=True):
     """Perform OCR on the given image using Llama 3.2-Vision."""
-    base64_image = encode_image_to_base64(image_path)
+    base64_image = encode_image_to_base64(image_path, url)
     ocr_res = ollama.chat(
         model='llama3.2-vision',
         messages=[{
@@ -52,11 +59,7 @@ def perform_ocr(image_path):
     ocr_result = json.loads(ocr_res.model_dump_json())
     ocr_content = ocr_result['message']['content']
 
-    print("===========================")
-    print(date)
-    pprint(ocr_content)
-    print("===========================")
-    # 소요시간을 초단위로 계산
+    # phi4 chat model to get the final result.
     chat_res = ollama.chat(
         model='phi4',
         messages=[{
@@ -68,8 +71,10 @@ def perform_ocr(image_path):
     )
     chat_result = json.loads(chat_res.model_dump_json())
     chat_content = chat_result['message']['content']
-    print("===========================")
-    pprint(chat_content)
-    print("===========================")
+    json_data = json.loads(extract_json_str(chat_content))
+    return json_data
 
-    return date, chat_res
+
+if __name__ == "__main__":
+    image_path = "/Users/petercha/Downloads/IMG_5954.jpg"
+    perform_ocr(image_path, False)

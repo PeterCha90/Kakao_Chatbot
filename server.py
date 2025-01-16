@@ -301,10 +301,34 @@ async def image_url(req: Dict):
     secure_urls = [url.strip() for url in secure_urls_str.split(',')]
 
     try:
+        results = []
         for url in secure_urls:
-            date, result = perform_ocr(url)
-            print(result)
-        return msg(result)
+            results.extend(perform_ocr(url))
+
+        print(results)
+
+        summary = {}
+        for order in results:
+            if order['item'] not in summary:
+                summary[order['item']] = {'total_count': 0, 'customers': set()}
+            summary[item['item']]['total_count'] += item['count']
+            summary[item['item']]['customers'].add(
+                (item['customer'], item['count']))
+
+        # 결과를 정리한 딕셔너리를 출력
+        for item, info in summary.items():
+            print(f"Item: {item}")
+            print(f"Total Count: {info['total_count']}")
+            print("Customers:")
+            for customer, count in info['customers']:
+                print(f"  {customer}: {count}")
+
+        # trim the final message
+        message = """
+        🌿 이미지 분석결과 입니다.
+        """
+        print(message)
+        # return msg(message)
 
     except Exception as e:
         print(f"Error: {e}")
