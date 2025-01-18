@@ -25,8 +25,8 @@ model Order {
   deposit      Boolean  @default(false)
   type         String  
   count        Int     
-  created_at   DateTime
-  scheduled_at DateTime?
+  created_at   String
+  scheduled_at String?
   status       String   // 준비중, 배달중, 완료
   item         Item     @relation(fields: [item_name], references: [name])
 }

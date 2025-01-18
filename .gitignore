@@ -10,6 +10,7 @@ dist/
 venv/
 *.egg-info/
 test-results/
+.DS_Store
 .vscode/
 .idea/
 *.DS_Store/

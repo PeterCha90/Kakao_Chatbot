@@ -1,4 +1,5 @@
 import json
+import pytz
 import uvicorn
 
 from utils import msg
@@ -7,11 +8,11 @@ from pprint import pprint
 from prisma import Prisma
 from fastapi import FastAPI
 from typing import List, Union
-from langserve import add_routes
+from datetime import datetime
 from llama_vision import perform_ocr
 from pydantic import BaseModel, Field
 from fastapi.responses import RedirectResponse
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware8.cors import CORSMiddleware
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 
 
@@ -34,6 +35,7 @@ async def redirect_root_to_docs():
     return RedirectResponse("/chain")
 
 
+# 🏷️ DONE
 ############### 상품 등록 ###################
 # req로 받아온 item_name, price를 받아서      #
 # item 테이블에 저장                         #
@@ -72,6 +74,7 @@ async def addItem(req: Dict):
         await db.disconnect()
 
 
+# 🏷️ DONE
 ############## 상품 테이블 조회 ###############
 # item에 등록되어 있는 상품을 모두 조회하여 반환    #
 # #########################################
@@ -103,7 +106,7 @@ async def getTable(req: Dict):
         reply['closed'] = closed_str
 
         if not reply['opened']:
-            reply['opened'] = '🌿 현재 등록된 상품이 없습니다.'
+            reply['opened'] = '🌿 현재 오픈된 상품이 없습니다.'
         if not reply['closed']:
             reply['closed'] = '🌿 현재 마감된 상품이 없습니다.'
         pprint(reply)
@@ -115,6 +118,7 @@ async def getTable(req: Dict):
         await db.disconnect()
 
 
+# 🏷️ DONE
 ############### 상품 마감 ####################
 # item 테이블에서 찾은 뒤 마감여부 True로 업데이트  #
 ###########################################
@@ -141,11 +145,12 @@ async def endItem(req: Dict):
 
     except Exception as e:
         print(f'========= {e}')
-        return msg("🌿\n오류가 발생했습니다. 다시 시도해주세요. :()")
+        return msg("🌿 오류가 발생했습니다. 다시 시도해주세요. :()")
     finally:
         await db.disconnect()
 
 
+# 🏷️ DONE
 ############### 상품 삭제 ###################
 # item_name에 해당하는 상품을 삭제             #
 ###########################################
@@ -177,6 +182,7 @@ async def deleteItem(req: Dict):
         await db.disconnect()
 
 
+# 🏷️ DONE
 ############### 상품 재오픈 #################
 # item_name에 해당하는 상품을 재오픈           #
 ##########################################
@@ -184,16 +190,24 @@ async def deleteItem(req: Dict):
 async def reopenItem(req: Dict):
     await db.connect()
     try:
-        item_name = req['action']['params']['name']
-        item = await db.item.find_unique(where={"name": item_name})
-        if item:
-            if item.end:
-                await db.item.update(where={"name": item_name}, data={"end": False})
-                return msg(f"🌿 {item_name}을 재오픈했습니다.")
+        info = req['action']['params']['name']
+        items = info.split(',')
+
+        success, fail = [], []
+        for item_name in items:
+            item = await db.item.find_unique(where={"name": item_name})
+            if item and item.end:
+                await db.item.update(
+                    where={"name": item_name}, data={"end": False})
+                success.append(item_name)
             else:
-                return msg(f"🌿 {item_name} 이미 오픈된 상태입니다.")
-        else:
-            return msg("🌿 해당하는 이름의 상품이 없습니다. :(")
+                fail.append(item_name)
+
+        message = ""
+        message += f"🌿 {' '.join(success)}을 재오픈했습니다."
+        if (len(fail) > 0):
+            message += f"🌿 {' '.join(fail)} 상품들은 이미 오픈되어 있거나, 해당이름을 찾을 수 없어 재오픈하지 못했습니다 :("
+        return msg(message)
     except Exception as e:
         print(e)
         return msg(f"🌿 오류가 발생했습니다. 다시 시도해주세요.")
@@ -201,7 +215,8 @@ async def reopenItem(req: Dict):
         await db.disconnect()
 
 
-###################### 주문내역 확인 ###########################
+# 🏷️ DONE
+########################## 주문하기 ###########################
 # 특정 상품 주문 받기                                           #
 # 특정 상품에 대해 order를 새로 생성하는 함수                       #
 ############################################################
@@ -213,25 +228,31 @@ async def order(req: Dict):
         itemData = info.split(',')
 
         for idx, item_info in enumerate(itemData):
-            cstm, item_name, count, type, deposit = item_info.split('/')
-            print(cstm, item_name, count, type, deposit)
+            cstm, item_name, count, type, deposit = [
+                info.strip() for info in item_info.split('/')]
 
-            item_name = item_name.strip()
-            item = await db.item.find_unique(where={"name": item_name})
+            item = await db.item.find_unique(
+                where={"name": item_name})
 
             if item:
+                # 한국기준시 yyyy-mm-dd를 current_date이라는 변수로 저장
+                current_date = datetime.now(
+                    pytz.timezone('Asia/Seoul')).strftime('%Y-%m-%d')
+
                 await db.order.create(
                     data={
                         "item_name": item_name,
                         "customer": cstm,
                         "deposit": True if deposit == "입금" else False,
                         "type": type,
-                        "count": int(count)
+                        "count": int(count),
+                        "created_at": current_date,
+                        "status": "준비 중"
                     }
                 )
             else:
                 return msg(f"🌿 {item_name}라는 이름의 상품이 없습니다. ")
-        return msg(f"🌿 총 {len(itemData)}개 주문이 완료되었습니다. :)")
+        return msg(f"🌿 총 {len(itemData)}개 주문이 완료되었습니다. 감사합니다! :)")
 
     except Exception as e:
         print(e)
@@ -240,9 +261,7 @@ async def order(req: Dict):
         await db.disconnect()
 
 
-#####################  테스트🧪 완료  #########################
-
-
+# 🏷️ DONE
 ###################### 전체 주문내역 확인 #######################
 # 해당 item에 해당하는 order들을 order에서 조회한 뒤                #
 # 각 상품이름(Item table의 item) 별로 order 리스트로 묶어서 반환하시오 #
@@ -274,19 +293,34 @@ async def check_order_list():
         await db.disconnect()
 
 
+# 🧪 TEST
 ##################  특정 유저 주문내역 확인    ####################
 # Order Table의 현재 상태 조회                                  #
 #############################################################
-@app.post("/list_of_order")
+@app.post("/customer_order")
 async def list_of_order(req: Dict):
-    # item = await Item.get(id=item_id)
-    # if item.end:
-    #     raise HTTPException(
-    #         status_code=400, detail="This item is no longer available.")
-    # order = await Order.create(item=item, customer_id=customer_id)
-    return order
+    await db.connect()
+    try:
+        user = req['action']['params']['고객 아이디']
+        user = user.strip()
+        orders = await db.order.find_many(where={"customer": user})
+
+        if len(orders) > 0:
+            message = f"🌿 {user} 님의 주문내역입니다. :)\n"
+            for order in orders:
+                message += f"\n   ▫️ {order.created_at} {order.item_name} {order.count}건"
+        else:
+            return msg(f"🌿 {user}님은 아직 주문하신 내역이 업습니다. :)")
+        return msg(message)
+
+    except Exception as e:
+        print(e)
+        return msg(f"🌿 주문을 조회하던 중 오류가 발생했습니다.")
+    finally:
+        await db.disconnect()
 
 
+# 🏷️ DONE
 ###################### 이미지 수신  ###########################
 # 이미지 수신해서 llama3.2 vision을 OCR로 사용하기.               #
 # 해당 item Id를 itemId로 가지는 order 데이터 생성               #
@@ -310,25 +344,21 @@ async def image_url(req: Dict):
         summary = {}
         for order in results:
             if order['item'] not in summary:
-                summary[order['item']] = {'total_count': 0, 'customers': set()}
-            summary[item['item']]['total_count'] += item['count']
-            summary[item['item']]['customers'].add(
-                (item['customer'], item['count']))
+                summary[order['item']] = {'total_count': 0,
+                                          'customers': set()}
+            summary[order['item']]['total_count'] += order['count']
+            summary[order['item']]['customers'].add(
+                (order['customer'], order['count']))
 
-        # 결과를 정리한 딕셔너리를 출력
+        # 결과를 정리한 메세지를 출력
+        message = "🌿 이미지 분석결과 입니다."
         for item, info in summary.items():
-            print(f"Item: {item}")
-            print(f"Total Count: {info['total_count']}")
-            print("Customers:")
+            message += f"\n🏷️ {item} - {info['total_count']}건"
             for customer, count in info['customers']:
-                print(f"  {customer}: {count}")
+                message += f"\n  ✔️ {customer}: {count}"
 
-        # trim the final message
-        message = """
-        🌿 이미지 분석결과 입니다.
-        """
         print(message)
-        # return msg(message)
+        return msg(message)
 
     except Exception as e:
         print(f"Error: {e}")
@@ -342,7 +372,6 @@ class InputChat(BaseModel):
         ...,
         description="The chat messages representing the current conversation.",
     )
-
 
 # add_routes(app, rag_chain, path="/rag", enable_feedback_endpoint=True,
 #            enable_public_trace_link_endpoint=True,)

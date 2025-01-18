@@ -55,7 +55,6 @@ def perform_ocr(image_path, url=True):
         options={'temperature': 0},
     )
     # parsing the data
-    date = parser.isoparse(ocr_res['created_at']).date()
     ocr_result = json.loads(ocr_res.model_dump_json())
     ocr_content = ocr_result['message']['content']
 
@@ -76,5 +75,5 @@ def perform_ocr(image_path, url=True):
 
 
 if __name__ == "__main__":
-    image_path = "/Users/petercha/Downloads/IMG_5954.jpg"
+    image_path = "/Users/peter/Downloads/test.jpeg"
     perform_ocr(image_path, False)
