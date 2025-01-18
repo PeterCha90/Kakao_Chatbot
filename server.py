@@ -277,10 +277,10 @@ async def check_order_list():
 
             order_msg, total = "", 0
             for order in orders:
-                order_msg += f"\n    ◾️ {order.customer} {order.count}건 \
-                    \n      [입금] {'✅' if order.deposit else '❌'} [상태] {order.status}"
+                order_msg += f"\n    ◾️{order.customer} - {order.count}개 \
+                    \n         [입금] {'✅' if order.deposit else '❌'} [상태] {order.status}"
                 total += order.count
-            res_msg += f"\n\n▫️ {item_name}: 총 {total} 건"
+            res_msg += f"\n\n▫️ {item_name}: 총 {total} 개"
             res_msg += order_msg
 
         return msg(res_msg)
@@ -360,6 +360,16 @@ async def update_order(req: Dict):
                     )
                     message += f"\n\n ▫️ {order.customer}님의 {order.item_name} \
                                입금상태를 [{content}]으로 수정했습니다 :)"
+                # 진행상태 수정
+                elif type == "상태":
+                    await db.order.update(
+                        where={"id": int(id_num)},
+                        data={
+                            "status": content
+                        }
+                    )
+                    message += f"\n\n ▫️ {order.customer}님의 {order.item_name} \
+                               진행상태를 [{content}]으로 수정했습니다 :)"
                 else:
                     message += f"\n\n ▫️ {type}은 업데이트가 불가능한 항목입니다. :("
             else:
