@@ -11,22 +11,24 @@ generator client {
 }
 
 model Item {
-  id    Int     @id @default(autoincrement())
-  name  String  @unique
-  end   Boolean  @default(false) // default는 False
-  price Int
-  orders Order[]
+  id       Int     @id @default(autoincrement())
+  name     String  @unique
+  end      Boolean  @default(false) // default는 False
+  price    Int
+  amount   Int?
+  orders   Order[]
 }
 
 model Order {
-  id           Int      @id @default(autoincrement())
-  item_name    String 
-  customer     String
-  deposit      Boolean  @default(false)
-  type         String  
-  count        Int     
-  created_at   String
-  scheduled_at String?
-  status       String   // 준비중, 배달중, 완료
-  item         Item     @relation(fields: [item_name], references: [name])
+  id             Int      @id @default(autoincrement())
+  order_number   Int
+  item_name      String 
+  customer       String
+  deposit        Boolean  @default(false)
+  type           String  
+  count          Int     
+  created_at     String
+  scheduled_at   String?
+  status         String   // 준비중, 배달중, 완료
+  item           Item     @relation(fields: [item_name], references: [name])
 }

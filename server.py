@@ -10,10 +10,8 @@ from fastapi import FastAPI
 from typing import List, Union
 from datetime import datetime
 from llama_vision import perform_ocr
-from pydantic import BaseModel, Field
 from fastapi.responses import RedirectResponse
-from fastapi.middleware8.cors import CORSMiddleware
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+from fastapi.middleware.cors import CORSMiddleware
 
 
 app = FastAPI()
@@ -29,10 +27,10 @@ app.add_middleware(
     expose_headers=["*"],
 )
 
-
-@app.get("/")
-async def redirect_root_to_docs():
-    return RedirectResponse("/chain")
+# Flags
+# 👷🏻‍♂️ ING
+# 🧪 TEST
+# 🏷️ DONE
 
 
 # 🏷️ DONE
@@ -83,7 +81,6 @@ async def getTable(req: Dict):
     await db.connect()
     try:
         items = await db.item.find_many()
-        pprint(items)
         reply = {'opened': [], 'closed': []}
 
         # item을 순회하며 end 값이 true면 reply 'opened'에
@@ -109,7 +106,6 @@ async def getTable(req: Dict):
             reply['opened'] = '🌿 현재 오픈된 상품이 없습니다.'
         if not reply['closed']:
             reply['closed'] = '🌿 현재 마감된 상품이 없습니다.'
-        pprint(reply)
         return msg(reply)
     except Exception as e:
         print(e)
@@ -261,7 +257,7 @@ async def order(req: Dict):
         await db.disconnect()
 
 
-# 🏷️ DONE
+# 👷🏻‍♂️ ING - [TODO] 특정 기준일(yyyy.mm.dd)을 입력받아 이후 주문만 조회
 ###################### 전체 주문내역 확인 #######################
 # 해당 item에 해당하는 order들을 order에서 조회한 뒤                #
 # 각 상품이름(Item table의 item) 별로 order 리스트로 묶어서 반환하시오 #
@@ -274,31 +270,33 @@ async def check_order_list():
         items = await db.item.find_many()
         item_names = [item.name for item in items]  # 리스트로 변환
 
-        order_dict = {}
-        for item_name in item_names:
-            # order table에서 item_name이 item_name인 order의 모든 row 갯수 세기
-            order_count = await db.order.count(where={"item_name": item_name})
-            order_dict[item_name] = order_count
-
-        print(order_dict)
-        # order_dict에 있을 데이터에 맞춰 string만들기
         res_msg = f"🌿 주문 내역 확인 🌿"
-        for item_name, count in order_dict.items():
-            res_msg += f"\n▫️ {item_name}: {count} 건"
+        for item_name in item_names:
+            # order table에서 item_name이 item_name인 orders 조회
+            orders = await db.order.find_many(where={"item_name": item_name})
+
+            order_msg, total = "", 0
+            for order in orders:
+                order_msg += f"\n    ◾️ {order.customer} {order.count}건 \
+                    \n      [입금] {'✅' if order.deposit else '❌'} [상태] {order.status}"
+                total += order.count
+            res_msg += f"\n\n▫️ {item_name}: 총 {total} 건"
+            res_msg += order_msg
+
         return msg(res_msg)
     except Exception as e:
         print(e)
-        return msg(f"🌿 처리하던 중 오류가 발생했습니다.")
+        return msg(f"🌿 처리하던 중 오류가 발생했습니다. :(")
     finally:
         await db.disconnect()
 
 
-# 🧪 TEST
-##################  특정 유저 주문내역 확인    ####################
-# Order Table의 현재 상태 조회                                  #
-#############################################################
+# 🏷️ DONE
+##################  특정 유저 주문내역 확인  ####################
+# Order Table의 현재 상태 조회                                #
+###########################################################
 @app.post("/customer_order")
-async def list_of_order(req: Dict):
+async def customer_order(req: Dict):
     await db.connect()
     try:
         user = req['action']['params']['고객 아이디']
@@ -306,9 +304,11 @@ async def list_of_order(req: Dict):
         orders = await db.order.find_many(where={"customer": user})
 
         if len(orders) > 0:
-            message = f"🌿 {user} 님의 주문내역입니다. :)\n"
+            message = f"🌿 {user} 님의 주문내역입니다. :)"
             for order in orders:
-                message += f"\n   ▫️ {order.created_at} {order.item_name} {order.count}건"
+                message += f"\n\n▫️ 주문번호 {(order.created_at).replace('-', '')+str(order.id)}" + \
+                    f"\n      {order.item_name} {order.count}건" + \
+                    f"\n      [입금] {'✅' if order.deposit else '❌'} [상태] {order.status}"
         else:
             return msg(f"🌿 {user}님은 아직 주문하신 내역이 업습니다. :)")
         return msg(message)
@@ -321,6 +321,59 @@ async def list_of_order(req: Dict):
 
 
 # 🏷️ DONE
+##################  특정 주문 수정하기  ####################
+# 주문번호와 수정하려는 주문 업데이트 하기                      #
+#######################################################
+@app.post("/update_order")
+async def update_order(req: Dict):
+    await db.connect()
+    try:
+        orders_info = req['action']['params']['order']
+        orders = orders_info.split(',')
+
+        message = "🌿 아래와 같이 수정되었습니다."
+        for order_info in orders:
+            order_number, type, content = [
+                info.strip() for info in order_info.split('/')]
+            id_num = order_number[8:]
+            order = await db.order.find_unique(where={"id": int(id_num)})
+
+            if order:
+                if type == "수량":
+                    # Update the order document with the new information
+                    await db.order.update(
+                        where={"id": int(id_num)},
+                        data={
+                            "count": int(content),
+                        }
+                    )
+                    # Return the updated order document
+                    message += f"\n\n ▫️ {order.customer}님의 {order.item_name} \
+                               상품 주문수량을 [{content}]으로 수정했습니다 :)"
+                # 입금내역 수정
+                elif type == "입금":
+                    await db.order.update(
+                        where={"id": int(id_num)},
+                        data={
+                            "deposit": True if content == "입금" else False
+                        }
+                    )
+                    message += f"\n\n ▫️ {order.customer}님의 {order.item_name} \
+                               입금상태를 [{content}]으로 수정했습니다 :)"
+                else:
+                    message += f"\n\n ▫️ {type}은 업데이트가 불가능한 항목입니다. :("
+            else:
+                message += f"\n\n ▫️ 주문번호 {order_number}에 해당하는 주문을 찾지 못했습니다. :("
+        return msg(message)
+
+    except Exception as e:
+        print(e)
+        return msg(f"🌿 주문을 조회하던 중 오류가 발생했습니다.")
+    finally:
+        await db.disconnect()
+
+
+# 👷🏻‍♂️ ING - [TODO] AI가 정리한 주문 실제 주문으로 저장하기
 ###################### 이미지 수신  ###########################
 # 이미지 수신해서 llama3.2 vision을 OCR로 사용하기.               #
 # 해당 item Id를 itemId로 가지는 order 데이터 생성               #
@@ -363,19 +416,6 @@ async def image_url(req: Dict):
     except Exception as e:
         print(f"Error: {e}")
         return msg("🌿 문제가 발생했어요. :(")
-
-
-class InputChat(BaseModel):
-    """Input for the chat endpoint."""
-
-    messages: List[Union[HumanMessage, AIMessage, SystemMessage]] = Field(
-        ...,
-        description="The chat messages representing the current conversation.",
-    )
-
-# add_routes(app, rag_chain, path="/rag", enable_feedback_endpoint=True,
-#            enable_public_trace_link_endpoint=True,)
-# add_routes(app, chain, path="/chain")
 
 
 if __name__ == "__main__":
